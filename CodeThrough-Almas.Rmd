@@ -1,0 +1,422 @@
+---
+title: "<span style='color: #3498db;'> Forecasting 2025 Job Market using ARIMA</span>"
+author: "by Rubina Almas"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: 
+    html_document:
+      self_contained: true
+      theme: readable
+      df_print: paged
+      highlight: tango
+      toc: yes
+      toc_float:
+         collapsed: false
+         smooth_scroll: true 
+      css: styles.css
+runtime: shiny
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE, 
+                      warning = FALSE, 
+                      fig.width = 10, 
+                      fig.height = 8)
+
+
+library(pander)
+library(kableExtra)
+library(readr)
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(forecast)
+library(ggplot2)
+library(shiny)
+
+
+```
+
+
+<br>
+<br>
+<span style="color: red;">**Note : This code only provides a comprehensive example for the ARIMA model, a robust method for time series forecasting, it is based on the assumption that future patterns will resemble historical trends. Unexpected economic events or policy changes can impact the accuracy of our predictions. Anyway, Happy Reading :)**</span>
+
+
+
+# **Introduction**
+
+Are we not all a bit scared of the looming recession? Indeed, we are! But the remarkable thing about us humans is our innate potential to prepare for the worst. No matter how challenging the future may seem, we have the resilience to navigate through it and emerge stronger.Here we are just Observing into the economic crystal ball, we predict the ripples of recession, mapping the future unemployment tide. This purpose of this analysis is to forecast the unemployment rate in the United states for the year 2025. conomic recessions, characterized by significant declines in economic activity across the economy, often result in increased unemployment rates. Accurate forecasting of unemployment rates during such periods is crucial for policymakers, economists, and business leaders and also (us) students.
+
+<br>
+
+**The section " KNOW MORE" before " conclusion " provides a comprehensive description of every function used in the code**
+
+In the code, we first installed these packages : 
+<br>
+
+1. **readxl**: I had to download this package because I have a dataset used that is in Excel. Therefore, in R is used to read Excel files (both .xls and .xlsx) into R for data analysis
+
+2. **readr**: I used two datasets for this code therefore I downloaded this package to read the csv files. Therefore, in R it is used to read and write tabular data, such as CSV files, into R for data analysis.
+
+3. **dplyr**: The dplyr package in R provides a set of functions for data manipulation, allowing you to easily filter, select, arrange, mutate, and summarize data
+
+4. **tidyr**: The tidyr package in R is used to tidy data, making it easy to reshape and clean data into a consistent format for analysis
+
+5. **lubridate**: This package in R is used to work with date and time data, providing functions to parse, manipulate, and perform arithmetic on dates and times.
+
+6. **forecast**: The forecast package in R is used for time series analysis, providing tools to fit, analyze, and forecast time series data using various methods such as ARIMA, exponential smoothing, and more.
+
+7. **ggplot2**: This package in R is used for data visualization, providing a powerful and flexible system for creating complex and aesthetically pleasing graphs and plots using the grammar of graphics.
+
+8. **pander**: The pander package in R is used to render data frames, tables, and other R objects in Markdown, HTML, or LaTeX formats, making it easier to present results in a well-formatted and readable manner.
+
+9. **kableExtra** : The kableExtra package in R enhances the functionality of knitr::kable(), allowing for the creation of complex and aesthetically pleasing tables in HTML and LaTeX formats with additional features like styling, formatting, and customization options.
+
+10. **Shiny** : Shiny in R is used for creating interactive web applications, enabling dynamic data visualization and real-time user interaction.
+
+We then loaded these packages into our RMD document.
+
+# <span style="color: darkblue;">**ARIMA?**</span
+
+<br>
+**ARIMA** (AutoRegressive Integrated Moving Average) is a popular statistical modeling technique used for time series forecasting. It combines three components:
+<br>
+<br>
+**1.	AutoRegressive (AR)**: Uses dependencies between an observation and several lagged observations (previous values).
+<br>
+**2.	Integrated (I)**: Involves difference in the observations to make the time series stationary, removing trends and seasonality.
+<br>
+**3.	Moving Average (MA)**: Models the relationship between an observation and a residual error from a moving average model applied to lagged observations.
+<br>
+<br>
+<span style="color: darkgreen;">**The model is specified as ARIMA(p,d,q), where:**</span
+<br>
+<br>
+**p: Number of lag observations in the model (autoregressive part).**
+<br>
+**d: Degree of differencing needed to make the series stationary.**
+<br>
+**q: Size of the moving average window.** 
+<br>
+<br>
+**ARIMA** models are powerful for capturing complex patterns in time series data, allowing for accurate short-term forecasting by accounting for trends, seasonality, and noise in the data.
+
+ 
+# **➡ Loading data**
+The data sets were loaded. I made use of two different data sets. The first is a csv file that displays the unemployment rate historical data.The federal reserve's interest rates are included in the other (the sources of both data sets are listed in the resources section below).
+
+
+
+```{r}
+
+# URLs to the data files
+unemployment_url <- 'https://raw.githubusercontent.com/rubinaalmas/DATA-/main/Unemployment%20Rate%20in%20United%20States.csv'
+interest_url <- 'https://raw.githubusercontent.com/rubinaalmas/DATA-/main/interest.csv'
+
+# Temporary file paths to save the downloaded files
+unemployment_file <- tempfile(fileext = ".csv")
+interest_file <- tempfile(fileext = ".csv")
+
+# Download the files
+download.file(unemployment_url, unemployment_file)
+download.file(interest_url, interest_file)
+
+# Read the CSV files
+unemployment_data <- read_csv(unemployment_file)
+interest_rates_data <- read_csv(interest_file)
+
+# Display the first few rows of the data
+head(unemployment_data)
+head(interest_rates_data)
+```
+<br>
+
+# **➡ Data processing**
+Here , the code extracts the year from the Variable observation date column and creates a new Year column. Since the data sets contain historical data, we have filtered a time period of 2000 to 2022 for accuracy. Here, the code also groups the data by the year column, and calculates the avg unemployment rate for each year and stores it in a new column Unemployment_Rate.
+<br>
+**group_by** is used to group the data by the ‘Year’ column, allowing subsequent operations to be performed on each year separately. The **summarize** function then calculates the average unemployment rate for each year, creating a new column, Unemployment_Rate, with these yearly averages. The **filter** function subsets the data to include only the years between 2000 and 2022, ensuring the analysis is focused on this specific time period. 
+<br>
+```{r plot-unemployment-data, include= TRUE}
+unemployment_data_plot <- unemployment_data %>%
+  mutate(Year = year(ymd(paste0(`Variable observation date`, "-01")))) %>%
+  filter(Year >= 2000 & Year <= 2022) %>%
+  group_by(Year) %>%
+  summarize(Unemployment_Rate = mean(`Variable observation value`, na.rm = TRUE))
+```
+<br>
+
+# **➡ Plotting unemployment trend**
+In order to track the increase in the unemployment rate throughout the years we wish to focus on, we plot the data from the first data set(unemployment_data) here using **ggplot** function. The year is displayed on the x axis, and the year's unemployment rate is displayed on the y axis.
+<br>
+The **labs** function adds a title and axis labels, and **theme_minimal** provides a clean, minimalist style to the plot. This implementation effectively visualizes the ARIMA model’s forecast results.
+
+<br>
+``` {r}
+ggplot(unemployment_data_plot, aes(x = Year, y = Unemployment_Rate)) +
+  geom_line() +
+  labs(title = "Unemployment Rate in the United States (2000-2022)",
+       x = "Year",
+       y = "Unemployment Rate") +
+  theme_minimal()
+```
+<br>
+
+Now, since the global financial recession happened between 2008 and 2010, that's the only time period I want you to concentrate on. Despite the fact that 2020 will see an enormous rise due to COVID-19, that year we do see a severe recession.
+
+<br>
+
+# **➡ Plotting interest rates**
+
+In order to track the changes in interest rate set by Federal reserve throughout the years we wish to focus on, we plot the data from the second data set(interest data) here using **ggplot** function. The year is displayed on the x axis, and the year's interest rate is displayed on the y axis.
+
+<br>
+```{r plot-interest-rates-data, include= TRUE}
+
+interest_rates_long <- interest_rates_data %>%
+  pivot_longer(cols = starts_with("19") | starts_with("20"), names_to = "Year", values_to = "Interest Rate") %>%
+  mutate(Year = as.integer(Year)) %>%
+  filter(Year >= 2000 & Year <= 2022)
+
+ggplot(interest_rates_long, aes(x = Year, y = `Interest Rate`)) +
+  geom_line() +
+  labs(title = "Interest Rates on Consumer Goods (2000-2022)",
+       x = "Year",
+       y = "Interest Rate (%)") +
+  theme_minimal()
+```
+<br>
+
+Now, since the global financial recession happened between 2008 and 2010, that's the only time period I want you to concentrate on. Despite the fact that late 2020 will see an enormous rise due to COVID-19, that year we do see a severe recession.
+
+<br>
+
+In 2008, interest rates were raised, but the following year saw a sharp decline. The federal government decided to hike these rates again to stabilize the economy.
+
+<br>
+
+# **➡ Merging and visualizing**
+
+This code reshapes the interest_rates_data to a long format, converting columns starting with “19” or “20” into rows with year and interest rate values. It then merges this reshaped data with the filtered unemployment_data by the Year column, selects relevant columns, and renames the unemployment rate column to Unemployment_Rate for clarity in further analysis.
+<br>
+**select** is used to choose specific columns from the dataset, simplifying the data to only those of interest. **rename** changes the names of columns for clarity or consistency. 
+
+<br>
+```{r}
+unemployment_data <- unemployment_data %>%
+  mutate(Year = year(ymd(paste0(`Variable observation date`, "-01")))) %>%
+  filter(Year >= 2000 & Year <= 2022)
+
+interest_rates_long <- interest_rates_data %>%
+  pivot_longer(cols = starts_with("19") | starts_with("20"), names_to = "Year", values_to = "Interest Rate") %>%
+  mutate(Year = as.integer(Year))
+
+merged_data <- unemployment_data %>%
+  left_join(interest_rates_long, by = "Year") %>%
+  select(Year, `Variable observation value`, `Interest Rate`) %>%
+  rename(Unemployment_Rate = `Variable observation value`)
+
+head(merged_data)
+```
+<br>
+
+Now we have our final data up ⬆️ here.
+
+# **➡ Fits ARIMA model**
+
+This code converts the Unemployment_Rate column from merged_data into a time series object (unemployment_ts) spanning from 2000 to 2022 with an annual frequency. It then uses the auto.arima function from the forecast package to fit the best **ARIMA** model to this time series. Finally, it displays the summary of the fitted model, providing details on model parameters, goodness-of-fit statistics, and diagnostic measures.
+
+<br>
+```{r}
+unemployment_ts <- ts(merged_data$Unemployment_Rate, start = 2000, end = 2022, frequency = 1)
+fit <- auto.arima(unemployment_ts)
+summary(fit)
+```
+<br>
+
+The output shows the ARIMA model’s parameters as follows:
+<br>
+	•	Model: ARIMA(0,2,1) indicates no autoregressive terms, two differences, and one moving average term.
+<br>
+	•	Coefficients: ma1 (moving average coefficient) is -0.7782 with a standard error of 0.1228.
+<br>
+	•	Sigma^2: The estimated variance of the residuals is 0.02174.
+<br>
+	•	Log likelihood: The log likelihood of the model is 10.45.
+<br>
+	•	AIC, AICc, BIC: Model selection criteria values are -16.91 (AIC), -16.24 (AICc), and -14.82 (BIC), indicating model fit quality.
+<br>
+**Training set error measures:**
+<br>
+	•	ME: Mean Error is 0.0282.
+<br>
+	•	RMSE: Root Mean Squared Error is 0.1375.
+<br>
+	•	MAE: Mean Absolute Error is 0.1002.
+<br>
+	•	MPE: Mean Percentage Error is 0.5551.
+<br>
+	•	MAPE: Mean Absolute Percentage Error is 2.3452.
+<br>
+	•	MASE: Mean Absolute Scaled Error is 0.8167.
+<br>
+	•	ACF1: The first lag of the autocorrelation function of the residuals is -0.2486, indicating no strong autocorrelation in residuals.
+
+<br>
+
+# **➡ Forecast and visualizing**
+
+This code forecasts the unemployment rate for the next three years (2023, 2024, and 2025) using the fitted ARIMA model (fit). The **forecast** function generates these predictions, storing the results in forecasted_values. The **autoplot** function then visualizes these forecasted values, displaying a plot with the title “Unemployment Rate Forecast” and labeled axes for year and unemployment rate. The **theme_minimal** function ensures the plot has a clean, minimalistic style. Finally, the forecasted values are printed for review.
+
+<br>
+```{r}
+
+forecasted_values <- forecast(fit, h = 3) 
+
+autoplot(forecasted_values) +
+  labs(title = "Unemployment Rate Forecast",
+       x = "Year",
+       y = "Unemployment Rate") +
+  theme_minimal()
+```
+<br>
+
+Look at the values predicted by the ARIMA model below ⬇️
+
+<br>
+```{r}
+forecasted_values
+```
+<br>
+
+# **➡ Know More**
+
+```{r shiny code, echo = FALSE}
+shinyApp(
+  ui = fluidPage(
+    titlePanel(HTML("<span style='color: green;'>Know more about functions here</span>")),
+    sidebarLayout(
+      sidebarPanel(
+        h3("Topics"),
+        selectInput("topic", "Select Topic:", 
+                    choices = list("Autoplot" = "autoplot", 
+                                   "ggplot" = "ggplot", 
+                                   "geom_line" = "geom_line", 
+                                   "pivot_longer" = "pivot_longer", 
+                                   "left_join" = "left_join",
+                                   "mutate" = "mutate")),
+        uiOutput("subtopic_ui")
+      ),
+      mainPanel(
+        uiOutput("content")
+      )
+    )
+  ),
+  server = function(input, output, session) {
+    output$subtopic_ui <- renderUI({
+      selectInput("subtopic", "Select Subtopic:", 
+                  choices = list("Overview" = paste0(input$topic, "_overview"), 
+                                 "Implementation" = paste0(input$topic, "_implementation")))
+    })
+    
+    output$content <- renderUI({
+      switch(input$subtopic,
+             "autoplot_overview" = HTML("<h4>Autoplot Overview</h4><p>The autoplot function in R, particularly from the forecast package, is used for creating quick and informative visualizations of time series objects and forecast results. It automatically generates plots with appropriate axes and labels, allowing users to easily interpret and analyze time series data and model forecasts. autoplot simplifies the plotting process, providing a clean and effective way to visualize data trends, seasonality, and forecasted values, often with minimal additional code required for customization.</p>"),
+             
+             
+             "autoplot_implementation" = HTML("<h4>Autoplot Implementation</h4><p>autoplot is used to visualize the forecasted unemployment rate. After fitting an ARIMA model to the unemployment data and generating a three-year forecast, we implemented autoplot in the forecasting and visualizing section. Here, autoplot(forecasted_values) generates the plot for the forecasted data.:</p>"),
+             
+             
+             
+             "mutate_overview" = HTML("<h4>Mutate Overview</h4><p>The mutate function in R, part of the dplyr package, is used to create new variables or modify existing ones within a data frame. It allows you to add new columns based on transformations of existing columns, enabling complex data manipulation and feature engineering. For example, you can compute a new column by applying functions to existing columns, such as arithmetic operations, date conversions, or conditional calculations. The mutate function is powerful for preparing data for analysis or modeling, as it keeps the data frame structure intact while enhancing it with new, derived information for further insights.</p>"),
+             
+             
+             "mutate_implementation" = HTML("<h4>Mutate Implementation</h4><p>The mutate function is implemented to create a new column called Year from the Variable observation date column. The function in the code under **data processsing** section:
+1.Creates a new column Year.
+2.Converts Variable observation date to a proper date format with ymd.
+3.Extracts the year part of the date using the year function.
+4.The new Year column is then used for further filtering and summarizing the data.  </p>"),
+             
+             
+            
+             "ggplot_overview" = HTML("<h4>ggplot Overview</h4><p>ggplot2 is a widely-used data visualization package in R, known for its versatility and ability to create complex, multi-layered graphics. It operates on the principles of the “Grammar of Graphics,” enabling users to build plots incrementally by adding layers. Basic components include ggplot(), where data and aesthetic mappings are defined, and geoms like geom_line() or geom_bar() to specify the type of plot. Additional layers, such as themes and labels, enhance customization. ggplot2 is praised for its flexibility, allowing creation of publication-quality visuals and facilitating data exploration through clear, aesthetic graphics.</p>"),
+
+
+             "ggplot_implementation" = HTML("<h4>ggplot Implementation</h4><p>In our code ggplot2 is used to visualize trends in unemployment and interest rates.</p>"),
+
+
+             "geom_line_overview" = HTML("<h4>geom_line Overview</h4><p>geom_line is a function in the ggplot2 package in R, used to create line plots. It draws lines connecting data points, making it ideal for visualizing trends over time or continuous data. When you use geom_line(), you map your data to aesthetic attributes like x and y axes to define the horizontal and vertical coordinates of the points. This function can be customized with various parameters for color, size, and line type, allowing for clear and informative visual representation of data trends. It’s commonly used for time series analysis, stock prices, and other longitudinal data..</p>"),
+
+             "geom_line_implementation" = HTML("<h4>geom_line Implementation</h4><p>geom_line created line plots in our code, visualizing unemployment and interest rate trends over time, with year on the x-axis.</p>"),
+
+
+             "pivot_longer_overview" = HTML("<h4>pivot_longer Overview</h4><p>The pivot_longer function in R, part of the tidyr package, is used to transform data from a wide format to a long format. In a wide format, each variable is in a separate column, while in a long format, variables are stored in key-value pairs. pivot_longer collapses multiple columns into key-value pairs, making the data more suitable for analysis and visualization. You specify which columns to pivot, creating a new column for the variable names and another for their values. This function is useful for simplifying complex data structures and preparing data for functions that require long format.</p>"),
+
+
+             "pivot_longer_implementation" = HTML("<h4>pivot_longer Implementation</h4><p>In our code, under Merging and visualizing section, pivot_longer is used to transform the interest rates data from a wide format to a long format. The code  converts the columns with names starting with “19” or “20” (representing years) into a long format, creating two new columns: Year for the original column names and Interest Rate for the values. </p>"),
+
+
+             "left_join_overview" = HTML("<h4>left_join Overview</h4><p>The left_join function in R, part of the dplyr package, is used to merge two data frames based on a common key (or keys). It keeps all rows from the left data frame and adds matching rows from the right data frame. If there is no match, the resulting columns from the right data frame will contain NA for those rows. This function is useful for combining datasets while preserving the structure and all entries from the primary (left) dataset, often used for adding supplementary information or features to an existing data set.</p>"),
+
+
+             "left_join_implementation" = HTML("<h4>left_join Implementation</h4><p>In our code,under merging and visualizizng section, left_join is used to merge the unemployment data with the interest rates data based on the Year column.The code merges unemployment_data with interest_rates_long using the Year column as the key. It keeps all rows from unemployment_data and matches corresponding rows from interest_rates_long.</p>")
+      )
+    })
+  }
+)
+
+```
+
+# **Is it accurate?**
+
+**Now the question is, Is it accurate?** 
+
+So, The accuracy of the ARIMA model’s forecast for the unemployment rate in 2025 can be assessed based on several factors:
+<br>
+**Model Fit Statistics**: The summary output of the ARIMA model provides various fit statistics, such as AIC (Akaike Information Criterion) and BIC (Bayesian Information Criterion). Lower values of these criteria generally indicate a better-fitting model.
+<br>
+**Diagnostic Checks**: The model diagnostics, including residual plots and autocorrelation checks, are essential for verifying the assumptions of the ARIMA model. Ideally, residuals should be uncorrelated and normally distributed.
+<br>
+**Historical Data Coverage**: The accuracy of the forecast depends on the quality and extent of the historical data used. Our data spans from 2000 to 2022, covering multiple economic cycles, which strengthens the model’s reliability.
+<br>**External Factors**: The model assumes that future patterns will resemble historical trends. However, unforeseen economic events or policy changes can impact the accuracy of the forecast.
+
+Based on the available data and the ARIMA model’s performance, the forecasted values provide a reasonable estimate of the future unemployment rate. However, it’s crucial to continuously monitor economic indicators and update the model as new data becomes available to maintain its accuracy and relevance.
+<br>
+
+# **Conclusion** 
+
+In this comprehensive analysis, we explored the process of forecasting the unemployment rate in the United States for the year 2025 using a time series approach, specifically employing the ARIMA model. The steps involved in this analysis included data collection, cleaning, visualization, model fitting, and forecasting.
+
+# **Key Takeaways**
+<br>
+**Data Collection and Preparation**:
+We utilized readxl and readr for loading datasets, dplyr and tidyr for data manipulation, and lubridate for handling date and time data.
+
+**Visualization**:
+Using ggplot2, we created visual representations of the unemployment and interest rate data. 
+
+**Modeling and Forecasting**:
+The core of our analysis was the application of the ARIMA model, facilitated by the forecast package. We used auto.arima to automatically select the best-fitting model for our time series data. The subsequent forecast provided predictions for the unemployment rate up to 2025, which we visualized using autoplot.
+
+**Integration and Interactivity**:
+To enhance the user experience and interactivity of our analysis, we integrated Shiny, creating a dynamic web application that allows users to interact with the data and forecasts in real-time.
+
+➡️ Again the accuracy of our forecast depends on several factors, including the quality and extent of the historical data, the fit of the ARIMA model, and external economic factors.
+
+# **Further Resources**
+
+
+* You can download data for unemployment rates over the years from  [here](https://datacommons.org/explore/#q=unemployment%20rate%20by%20year%20in%20us)
+
+* You can download data for interest rates over the years from [here](https://www.kaggle.com/datasets/federalreserve/interest-rates)
+
+* You can skim [this page](https://www.investopedia.com/terms/a/autoregressive-integrated-moving-average-arima.asp)  to understand ARIMA
+
+<br>
+<br>
+
+**------------------------------------------------------------------THANK YOU------------------------------------------------------------------**
