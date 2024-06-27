@@ -1,3 +1,4 @@
+Before anyhting , please go through URL seen on the left
 ARIMA stands for (AR- autoregressive) (I - integrated) (M- Moving) (A- average) .
 ARIMA helps us to forecast or predict we trends based on the historical data. 
 So i chose the topic for predicting unemployment rate , that can happen if there is a recession in 2025, similar to recession in 2009. 
